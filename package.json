@@ -1,5 +1,5 @@
 {
-  "name": "net-monitor-latency",
+  "name": "net-latency-monitor",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,9 +9,14 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@influxdata/influxdb-client": "^1.35.0",
+    "dotenv": "^17.4.2",
+    "lucide-react": "^1.14.0",
     "next": "16.2.6",
+    "ping": "^1.0.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
