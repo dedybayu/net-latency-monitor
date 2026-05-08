@@ -9,13 +9,16 @@ export default function Home() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'historical' | 'realtime'>('realtime');
+    const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
+    const [availableHosts, setAvailableHosts] = useState<string[]>([]);
 
     useEffect(() => {
         const controller = new AbortController();
-
         const fetchData = async () => {
             try {
-                const response = await fetch(`/api/latency?type=${viewMode}`, {
+                // Pass selected hosts to the backend to filter data at the source
+                const hostsQuery = selectedHosts.length > 0 ? `&hosts=${selectedHosts.join(',')}` : '';
+                const response = await fetch(`/api/latency?type=${viewMode}${hostsQuery}`, {
                     signal: controller.signal
                 });
                 if (!response.ok) {
@@ -33,6 +36,24 @@ export default function Home() {
                     })
                 }));
                 setData(formattedData);
+                
+                // Update available hosts only if we fetched everything (no hosts filter)
+                // or if we want to detect new hosts that might have appeared
+                if (selectedHosts.length === 0 || availableHosts.length === 0) {
+                    const hosts = Array.from(new Set(result.flatMap((d: any) => Object.keys(d))))
+                        .filter(key => key !== 'time' && key !== 'formattedTime') as string[];
+                    
+                    setAvailableHosts(prev => {
+                        if (JSON.stringify(prev.sort()) !== JSON.stringify(hosts.sort())) {
+                            if (prev.length === 0) {
+                                setSelectedHosts(hosts);
+                            }
+                            return hosts;
+                        }
+                        return prev;
+                    });
+                }
+
                 setError(null);
             } catch (e: any) {
                 if (e.name === 'AbortError') {
@@ -53,7 +74,7 @@ export default function Home() {
             clearInterval(interval);
             controller.abort();
         };
-    }, [viewMode]);
+    }, [viewMode, selectedHosts]);
 
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
@@ -75,7 +96,7 @@ export default function Home() {
 
     return (
         <main className="min-h-screen bg-[#0a0a0c] text-white p-6 md:p-12 font-sans selection:bg-indigo-500/30">
-            <div className="max-w-7xl mx-auto mb-10">
+            <div className="max-w-full mx-auto mb-10">
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                     <div>
                         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-sm font-medium mb-4 border border-indigo-500/20">
@@ -131,13 +152,46 @@ export default function Home() {
                 </div>
             </div>
 
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-full mx-auto">
                 <div className="bg-gray-900/40 border border-gray-800/60 rounded-3xl p-6 md:p-8 backdrop-blur-md shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 left-1/4 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl -z-10" />
                     <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -z-10" />
 
-                    <div className="flex justify-between items-center mb-8">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                         <h2 className="text-xl font-semibold text-gray-200">{viewMode === 'realtime' ? 'Real-time Performance Trend' : '7-Day Performance Trend'}</h2>
+                        
+                        {/* Host Filters */}
+                        <div className="flex flex-wrap gap-2">
+                            {availableHosts.map((host, index) => {
+                                const isSelected = selectedHosts.includes(host);
+                                const hue = (index * (360 / Math.max(availableHosts.length, 5))) % 360;
+                                const color = `hsl(${hue}, 70%, 60%)`;
+                                
+                                return (
+                                    <button
+                                        key={host}
+                                        onClick={() => {
+                                            setSelectedHosts(prev => 
+                                                prev.includes(host) 
+                                                    ? prev.filter(h => h !== host) 
+                                                    : [...prev, host]
+                                            );
+                                        }}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-2 ${
+                                            isSelected 
+                                                ? 'bg-gray-800 border-gray-600 text-white shadow-lg' 
+                                                : 'bg-transparent border-gray-800 text-gray-500 hover:border-gray-700'
+                                        }`}
+                                    >
+                                        <div 
+                                            className={`w-2 h-2 rounded-full ${!isSelected && 'grayscale opacity-30'}`} 
+                                            style={{ backgroundColor: color }} 
+                                        />
+                                        {host}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     <div className="h-[500px] w-full">
@@ -162,14 +216,18 @@ export default function Home() {
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                     <defs>
-                                        <linearGradient id="colorNode1" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                                            <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                                        </linearGradient>
-                                        <linearGradient id="colorNode2" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.4} />
-                                            <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
-                                        </linearGradient>
+                                        {/* Dynamically generate gradients for every unique host found in the entire dataset */}
+                                        {availableHosts.map((host, index) => {
+                                                const hue = (index * (360 / Math.max(availableHosts.length, 5))) % 360;
+                                                const color = `hsl(${hue}, 70%, 60%)`;
+                                                return (
+                                                    <linearGradient key={`grad-${host}`} id={`color-${host.replace(/\./g, '-')}`} x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="5%" stopColor={color} stopOpacity={0.4} />
+                                                        <stop offset="95%" stopColor={color} stopOpacity={0} />
+                                                    </linearGradient>
+                                                );
+                                            })
+                                        }
                                     </defs>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} opacity={0.4} />
                                     <XAxis 
@@ -196,26 +254,32 @@ export default function Home() {
                                         iconType="circle"
                                         wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }}
                                     />
-                                    <Area 
-                                        type="monotone" 
-                                        dataKey="192.168.12.1" 
-                                        name="Node 192.168.12.1"
-                                        stroke="#6366f1" 
-                                        strokeWidth={3}
-                                        fillOpacity={1} 
-                                        fill="url(#colorNode1)" 
-                                        activeDot={{ r: 6, strokeWidth: 0, fill: "#818cf8" }}
-                                    />
-                                    <Area 
-                                        type="monotone" 
-                                        dataKey="172.16.20.1" 
-                                        name="Node 172.16.20.1"
-                                        stroke="#ec4899" 
-                                        strokeWidth={3}
-                                        fillOpacity={1} 
-                                        fill="url(#colorNode2)" 
-                                        activeDot={{ r: 6, strokeWidth: 0, fill: "#f472b6" }}
-                                    />
+                                    {/* Dynamically render Areas for every unique host found in the entire dataset */}
+                                    {availableHosts
+                                        .filter(host => selectedHosts.includes(host))
+                                        .map((host, index) => {
+                                            const hue = (index * (360 / Math.max(availableHosts.length, 5))) % 360;
+                                            const strokeColor = `hsl(${hue}, 70%, 60%)`;
+                                            const dotColor = `hsl(${hue}, 70%, 75%)`;
+                                            const gradientId = `url(#color-${host.replace(/\./g, '-')})`;
+                                            
+                                            return (
+                                                <Area 
+                                                    key={host}
+                                                    type="monotone" 
+                                                    dataKey={host} 
+                                                    name={`Node ${host}`}
+                                                    stroke={strokeColor} 
+                                                    strokeWidth={3}
+                                                    fillOpacity={1} 
+                                                    fill={gradientId} 
+                                                    activeDot={{ r: 6, strokeWidth: 0, fill: dotColor }}
+                                                    isAnimationActive={false}
+                                                    connectNulls={true}
+                                                />
+                                            );
+                                        })
+                                    }
                                 </AreaChart>
                             </ResponsiveContainer>
                         )}

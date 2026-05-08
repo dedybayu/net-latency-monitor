@@ -7,8 +7,16 @@ const INFLUX_TOKEN = process.env.INFLUX_TOKEN;
 const INFLUX_ORG = process.env.INFLUX_ORG;
 const INFLUX_BUCKET = process.env.INFLUX_BUCKET;
 
+const PING_TARGETS = process.env.PING_TARGETS || '192.168.12.1,10.10.168.1';
+const TARGETS = PING_TARGETS.split(',').map(t => t.trim()).filter(Boolean);
+
 if (!INFLUX_TOKEN || !INFLUX_ORG || !INFLUX_BUCKET) {
     console.error('Missing required InfluxDB environment variables. Check .env file.');
+    process.exit(1);
+}
+
+if (TARGETS.length === 0) {
+    console.error('No ping targets defined in PING_TARGETS environment variable.');
     process.exit(1);
 }
 
@@ -16,7 +24,6 @@ const influxDB = new InfluxDB({ url: INFLUX_URL, token: INFLUX_TOKEN });
 // Using 'ms' precision to be consistent with Javascript Date
 const writeApi = influxDB.getWriteApi(INFLUX_ORG, INFLUX_BUCKET, 'ms');
 
-const TARGETS = ['192.168.12.1', '172.16.20.1'];
 const INTERVAL_MS = 5000;
 
 async function pingAndSave() {

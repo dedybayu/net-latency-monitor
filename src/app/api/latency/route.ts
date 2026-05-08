@@ -15,26 +15,32 @@ export async function GET(request: Request) {
 
     const url = new URL(request.url);
     const type = url.searchParams.get('type') || 'historical';
+    const hostsParam = url.searchParams.get('hosts');
+    
+    // Build filter for specific hosts if provided
+    const hostFilter = hostsParam 
+        ? `|> filter(fn: (r) => ${hostsParam.split(',').map(h => `r.host == "${h.trim()}"`).join(' or ')})`
+        : '';
 
     const influxDB = new InfluxDB({ url: INFLUX_URL, token: INFLUX_TOKEN });
     const queryApi = influxDB.getQueryApi(INFLUX_ORG);
 
     let fluxQuery = '';
     if (type === 'realtime') {
-        // Last 15 minutes, raw data or 5s aggregate
         fluxQuery = `
             from(bucket: "${INFLUX_BUCKET}")
             |> range(start: -15m)
             |> filter(fn: (r) => r._measurement == "network_latency" and r._field == "latency")
+            ${hostFilter}
             |> aggregateWindow(every: 5s, fn: mean, createEmpty: false)
             |> yield(name: "mean")
         `;
     } else {
-        // 7 days, 5m aggregate
         fluxQuery = `
             from(bucket: "${INFLUX_BUCKET}")
             |> range(start: -7d)
             |> filter(fn: (r) => r._measurement == "network_latency" and r._field == "latency")
+            ${hostFilter}
             |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
             |> yield(name: "mean")
         `;
