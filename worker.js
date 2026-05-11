@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { InfluxDB, Point } = require('@influxdata/influxdb-client');
 const ping = require('ping');
+const tcpp = require('tcp-ping');
 
 const INFLUX_URL = process.env.INFLUX_URL || 'http://localhost:8086';
 const INFLUX_TOKEN = process.env.INFLUX_TOKEN;
@@ -29,22 +30,49 @@ const INTERVAL_MS = 5000;
 async function pingAndSave() {
     for (const host of TARGETS) {
         try {
-            const res = await ping.promise.probe(host, {
-                timeout: 2, // timeout in seconds
-            });
+            let latency = null;
+            let alive = false;
 
-            if (res.alive) {
-                const latency = parseFloat(res.time);
-                if (!isNaN(latency)) {
-                    const point = new Point('network_latency')
-                        .tag('host', host)
-                        .floatField('latency', latency);
-                    
-                    writeApi.writePoint(point);
-                    console.log(`[${new Date().toISOString()}] Ping ${host} successful: ${latency} ms`);
-                } else {
-                    console.log(`[${new Date().toISOString()}] Ping ${host} alive but time unknown.`);
+            if (host.includes(':')) {
+                // TCP Ping for host:port
+                const [address, portStr] = host.split(':');
+                const port = parseInt(portStr);
+                
+                if (isNaN(port)) {
+                    console.error(`[${new Date().toISOString()}] Invalid port for target: ${host}`);
+                    continue;
                 }
+
+                const result = await new Promise((resolve) => {
+                    tcpp.ping({ address, port, attempts: 1, timeout: 2000 }, (err, data) => {
+                        if (err || !data || isNaN(data.avg)) {
+                            resolve({ alive: false, latency: null });
+                        } else {
+                            resolve({ alive: true, latency: data.avg });
+                        }
+                    });
+                });
+                
+                alive = result.alive;
+                latency = result.latency;
+            } else {
+                // Standard ICMP Ping
+                const res = await ping.promise.probe(host, {
+                    timeout: 2, // timeout in seconds
+                });
+                alive = res.alive;
+                latency = parseFloat(res.time);
+            }
+
+            if (alive && latency !== null && !isNaN(latency)) {
+                const point = new Point('network_latency')
+                    .tag('host', host)
+                    .floatField('latency', latency);
+                
+                writeApi.writePoint(point);
+                console.log(`[${new Date().toISOString()}] Ping ${host} successful: ${latency.toFixed(2)} ms`);
+            } else if (alive) {
+                console.log(`[${new Date().toISOString()}] Ping ${host} alive but time unknown.`);
             } else {
                 console.log(`[${new Date().toISOString()}] Ping ${host} failed.`);
             }
