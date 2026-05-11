@@ -85,7 +85,7 @@ export default function Home() {
                         <div key={`item-${index}`} className="flex items-center gap-2 py-1">
                             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }} />
                             <span className="text-gray-400">{entry.name}:</span>
-                            <span className="font-semibold text-white">{entry.value !== undefined ? `${entry.value.toFixed(2)} ms` : 'N/A'}</span>
+                            <span className="font-semibold text-white">{entry.value != null ? `${entry.value.toFixed(2)} ms` : 'Offline / No Data'}</span>
                         </div>
                     ))}
                 </div>
@@ -214,7 +214,7 @@ export default function Home() {
                             </div>
                         ) : (
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                                     <defs>
                                         {/* Dynamically generate gradients for every unique host found in the entire dataset */}
                                         {availableHosts.map((host, index) => {
@@ -244,8 +244,9 @@ export default function Home() {
                                         fontSize={12} 
                                         tickLine={false} 
                                         axisLine={false} 
-                                        tickFormatter={(value) => `${value}ms`}
+                                        tickFormatter={(value) => value % 1 === 0 ? `${value}ms` : `${value.toFixed(1)}ms`}
                                         tickMargin={10}
+                                        width={50}
                                     />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Legend 
@@ -275,7 +276,7 @@ export default function Home() {
                                                     fill={gradientId} 
                                                     activeDot={{ r: 6, strokeWidth: 0, fill: dotColor }}
                                                     isAnimationActive={false}
-                                                    connectNulls={true}
+                                                    connectNulls={false}
                                                 />
                                             );
                                         })

@@ -32,7 +32,7 @@ export async function GET(request: Request) {
             |> range(start: -15m)
             |> filter(fn: (r) => r._measurement == "network_latency" and r._field == "latency")
             ${hostFilter}
-            |> aggregateWindow(every: 5s, fn: mean, createEmpty: false)
+            |> aggregateWindow(every: 5s, fn: mean, createEmpty: true)
             |> yield(name: "mean")
         `;
     } else {
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
             |> range(start: -7d)
             |> filter(fn: (r) => r._measurement == "network_latency" and r._field == "latency")
             ${hostFilter}
-            |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+            |> aggregateWindow(every: 5m, fn: mean, createEmpty: true)
             |> yield(name: "mean")
         `;
     }
