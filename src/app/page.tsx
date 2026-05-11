@@ -44,11 +44,12 @@ export default function Home() {
                         .filter(key => key !== 'time' && key !== 'formattedTime') as string[];
                     
                     setAvailableHosts(prev => {
-                        if (JSON.stringify(prev.sort()) !== JSON.stringify(hosts.sort())) {
+                        const sortedHosts = hosts.sort();
+                        if (JSON.stringify(prev) !== JSON.stringify(sortedHosts)) {
                             if (prev.length === 0) {
-                                setSelectedHosts(hosts);
+                                setSelectedHosts(sortedHosts);
                             }
-                            return hosts;
+                            return sortedHosts;
                         }
                         return prev;
                     });
@@ -255,10 +256,9 @@ export default function Home() {
                                         iconType="circle"
                                         wrapperStyle={{ fontSize: '14px', paddingTop: '10px' }}
                                     />
-                                    {/* Dynamically render Areas for every unique host found in the entire dataset */}
-                                    {availableHosts
-                                        .filter(host => selectedHosts.includes(host))
-                                        .map((host, index) => {
+                                    {availableHosts.map((host, index) => {
+                                            if (!selectedHosts.includes(host)) return null;
+                                            
                                             const hue = (index * (360 / Math.max(availableHosts.length, 5))) % 360;
                                             const strokeColor = `hsl(${hue}, 70%, 60%)`;
                                             const dotColor = `hsl(${hue}, 70%, 75%)`;
