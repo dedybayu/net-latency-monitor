@@ -8,7 +8,7 @@ export default function Home() {
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [viewMode, setViewMode] = useState<'historical' | 'realtime'>('realtime');
+    const [timeRange, setTimeRange] = useState('15m');
     const [selectedHosts, setSelectedHosts] = useState<string[]>([]);
     const [availableHosts, setAvailableHosts] = useState<string[]>([]);
 
@@ -18,7 +18,7 @@ export default function Home() {
             try {
                 // Pass selected hosts to the backend to filter data at the source
                 const hostsQuery = selectedHosts.length > 0 ? `&hosts=${selectedHosts.join(',')}` : '';
-                const response = await fetch(`/api/latency?type=${viewMode}${hostsQuery}`, {
+                const response = await fetch(`/api/latency?range=${timeRange}${hostsQuery}`, {
                     signal: controller.signal
                 });
                 if (!response.ok) {
@@ -68,14 +68,14 @@ export default function Home() {
         };
 
         fetchData();
-        const refreshRate = viewMode === 'realtime' ? 5000 : 60000;
+        const refreshRate = (timeRange === '15m' || timeRange === '30m') ? 5000 : 60000;
         const interval = setInterval(fetchData, refreshRate);
         
         return () => {
             clearInterval(interval);
             controller.abort();
         };
-    }, [viewMode, selectedHosts]);
+    }, [timeRange, selectedHosts]);
 
     const CustomTooltip = ({ active, payload }: any) => {
         if (active && payload && payload.length) {
@@ -108,23 +108,27 @@ export default function Home() {
                             Network Latency
                         </h1>
                         <p className="text-gray-400 mt-2 max-w-xl">
-                            {viewMode === 'realtime' ? 'Real-time latency metrics for internal network nodes over the last 15 minutes.' : 'Historical latency metrics for internal network nodes over the last 7 days.'}
+                            Latency metrics for internal network nodes over the last {timeRange.replace('m', ' minutes').replace('d', ' days')}.
                         </p>
                     </div>
                     <div className="flex flex-col md:items-end gap-4">
-                        <div className="flex bg-gray-900/50 p-1 rounded-lg border border-gray-700/50 w-fit">
-                            <button 
-                                onClick={() => setViewMode('realtime')}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${viewMode === 'realtime' ? 'bg-indigo-500 text-white shadow-lg' : 'text-gray-400 hover:text-gray-200'}`}
-                            >
-                                Real-time (15m)
-                            </button>
-                            <button 
-                                onClick={() => setViewMode('historical')}
-                                className={`px-4 py-2 text-sm font-medium rounded-md transition-all ${viewMode === 'historical' ? 'bg-indigo-500 text-white shadow-lg' : 'text-gray-400 hover:text-gray-200'}`}
-                            >
-                                7 Days (5m Avg)
-                            </button>
+                        <div className="flex flex-wrap bg-gray-900/50 p-1 rounded-lg border border-gray-700/50 w-fit gap-1">
+                            {[
+                                { label: '15m', value: '15m' },
+                                { label: '30m', value: '30m' },
+                                { label: '1d', value: '1d' },
+                                { label: '3d', value: '3d' },
+                                { label: '7d', value: '7d' },
+                                { label: '14d', value: '14d' },
+                            ].map((range) => (
+                                <button 
+                                    key={range.value}
+                                    onClick={() => setTimeRange(range.value)}
+                                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${timeRange === range.value ? 'bg-indigo-500 text-white shadow-lg' : 'text-gray-400 hover:text-gray-200 hover:bg-gray-800/50'}`}
+                                >
+                                    {range.label}
+                                </button>
+                            ))}
                         </div>
                         <div className="flex gap-4">
                             <div className="bg-gray-800/50 border border-gray-700/50 rounded-xl p-4 backdrop-blur-sm flex items-center gap-4">
@@ -145,7 +149,13 @@ export default function Home() {
                                 </div>
                                 <div>
                                     <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Interval</p>
-                                    <p className="font-semibold">{viewMode === 'realtime' ? '5s Avg' : '5m Avg'}</p>
+                                    <p className="font-semibold">
+                                        {timeRange === '15m' ? '5s Avg' : 
+                                         timeRange === '30m' ? '10s Avg' : 
+                                         timeRange === '1d' ? '5m Avg' : 
+                                         timeRange === '3d' ? '15m Avg' : 
+                                         timeRange === '7d' ? '30m Avg' : '1h Avg'}
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -159,7 +169,7 @@ export default function Home() {
                     <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl -z-10" />
 
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-                        <h2 className="text-xl font-semibold text-gray-200">{viewMode === 'realtime' ? 'Real-time Performance Trend' : '7-Day Performance Trend'}</h2>
+                        <h2 className="text-xl font-semibold text-gray-200">Performance Trend ({timeRange})</h2>
                         
                         {/* Host Filters */}
                         <div className="flex flex-wrap gap-2">
@@ -210,7 +220,7 @@ export default function Home() {
                         ) : data.length === 0 ? (
                             <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-800/30 rounded-2xl border border-gray-700/30">
                                 <Server className="mb-4 opacity-50" size={48} />
-                                <p>No latency data available for the {viewMode === 'realtime' ? 'last 15 minutes' : 'last 7 days'}.</p>
+                                <p>No latency data available for the last {timeRange.replace('m', ' minutes').replace('d', ' days')}.</p>
                                 <p className="text-sm mt-2 opacity-60">Ensure the worker is running and writing to InfluxDB.</p>
                             </div>
                         ) : (
