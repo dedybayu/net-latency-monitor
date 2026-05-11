@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Network Latency Monitor
 
-## Getting Started
+A real-time network latency monitoring dashboard built with Next.js, Recharts, and InfluxDB. It features a background worker that pings multiple targets and stores the data for visualization.
 
-First, run the development server:
+## 🚀 Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Before you begin, ensure you have the following installed:
+- **Node.js**: v18 or later
+- **InfluxDB**: v2.x (Local or Cloud)
+- **PM2**: (Optional) For production deployment
+
+## 🛠️ Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone <repository-url>
+   cd net-latency-monitor
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+   **Packages installed:**
+   - `@influxdata/influxdb-client`: For InfluxDB communication.
+   - `ping`: To perform network pings.
+   - `recharts`: For data visualization.
+   - `lucide-react`: For UI icons.
+   - `dotenv`: To manage environment variables.
+   - `next`, `react`, `react-dom`: Core web framework.
+
+## ⚙️ Configuration
+
+Create a `.env` file in the root directory (or edit the existing one) with the following variables:
+
+```env
+INFLUX_URL="http://localhost:8086"
+INFLUX_TOKEN="your-influx-token"
+INFLUX_ORG="your-org-name"
+INFLUX_BUCKET="your-bucket-name"
+
+# Comma-separated list of IP addresses or hostnames to monitor
+PING_TARGETS="192.168.1.1,8.8.8.8,google.com"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🏃 Running the Application
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Development Mode
+Run both the web server and the worker in separate terminals:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Terminal 1 (Web):**
+```bash
+npm run dev
+```
 
-## Learn More
+**Terminal 2 (Worker):**
+```bash
+node worker.js
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 2. Production Mode (PM2)
+We use PM2 to manage both processes efficiently.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+**Start everything:**
+```bash
+pm2 start ecosystem.config.js
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Common PM2 Commands:**
+- `pm2 status`: Check if services are running.
+- `pm2 logs`: View real-time logs.
+- `pm2 restart all`: Restart both web and worker.
+- `pm2 save`: Save process list to restart after reboot.
 
-## Deploy on Vercel
+## 🏗️ Architecture
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **`worker.js`**: A standalone Node.js script that pings targets every 5 seconds and writes results to InfluxDB.
+- **`src/app/api/latency/route.ts`**: API endpoint that queries InfluxDB using Flux and returns formatted data for the frontend.
+- **`src/app/page.tsx`**: The main dashboard UI using Recharts to display historical and real-time trends.
+- **`ecosystem.config.js`**: Configuration for PM2 to run both the Next.js server and the ping worker.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 📊 Features
+
+- **Real-time Monitoring**: View latency trends from the last 15 minutes.
+- **Historical View**: View average latency over the last 7 days.
+- **Host Filtering**: Toggle specific hosts on/off in the chart.
+- **Dynamic Gradients**: Auto-generated HSL colors for each host.
+- **Responsive Design**: Works on mobile and desktop.
